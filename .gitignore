@@ -20,3 +20,5 @@ data/processed/
 
 # VS Code settings (optional)
 .vscode/
+
+.env
