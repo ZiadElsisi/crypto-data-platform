@@ -16,3 +16,23 @@ Failed or invalid requests should not be treated as successful ingestion.
 Configuration:
 
 Source credentials and request parameters should not be hard-coded.
+
+                 get_crypto_list()
+                       │
+             date_string provided?
+                 /            \
+               No              Yes
+               │                │
+        Current data       Historical data
+               │                │
+               └───────┬────────┘
+                       ↓
+                  API response
+                       ↓
+                  status check
+                    /     \
+                  error    success
+                            ↓
+                       JSON response
+                            ↓
+                        data/raw/
