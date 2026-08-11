@@ -1,2 +1,3 @@
-from src.ingestion import ApiIngest
-ApiIngest.ingest_crypto_data(date_string='2026-08-03')
+from src.ingestion import api_ingest
+
+api_ingest.CMC_API_INGEST()

@@ -13,7 +13,7 @@ if CRYPTO_API_KEY is None:
 # The Api url :
 url = ('https://pro-api.coinmarketcap.com')
 
-def ingest_crypto_data(limit=100 , date_string=None):
+def CMC_API_INGEST(limit=100 , date_string=None):
     # if we didn't mention the date it will work on now data
     if date_string is None:
         date = datetime.datetime.now()
@@ -28,8 +28,7 @@ def ingest_crypto_data(limit=100 , date_string=None):
     if r.status_code != 200:
         print("Error : " + r.text)
     else:
-
-        # get absolute path of ApiIngest.py
+        # getting the absloute path of the file
         BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 
         # go up two levels to project root, then into data/raw
