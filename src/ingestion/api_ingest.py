@@ -42,3 +42,4 @@ def CMC_API_INGEST(limit=100 , date_string=None):
             json.dump(r.json(), f) # write json into the file
 
 
+    return path

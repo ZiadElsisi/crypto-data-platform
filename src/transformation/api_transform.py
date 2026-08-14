@@ -59,11 +59,9 @@ def CMC_API_Transform(Path):
     File_date= Path[-24:-5]
     BASE_DIR = os.path.dirname(os.path.abspath(__file__))
     Processed_DIR = os.path.join(BASE_DIR, "..", "..", "data", "processed","CMC",Raw_Data_Type)
-    os.makedirs(Processed_DIR,exist_ok=True)
     df.to_csv(os.path.join(Processed_DIR,f"{File_date}.csv"), index=False)
 
 
 
 
 
-CMC_API_Transform("../../data/raw/CMC/Real-time/Crypto_data_at_2026-08-11_21-49-34.json")
