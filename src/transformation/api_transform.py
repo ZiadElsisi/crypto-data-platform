@@ -2,19 +2,15 @@ import os
 import pandas as pd
 import json
 
-def CMC_API_Transform(Path):
+def cmc_api_transform(Path,d_type):
     # Check if path exists
     if not os.path.exists(path=Path):
-        print("Path does not exist")
-        raise FileNotFoundError
+        raise FileNotFoundError("Path does not exist")
 
-    #Chech Real-time Or historical
-    if "Real-time"  in Path:
-        Raw_Data_Type = "Real-time"
-    elif "Historical" in Path:
-        Raw_Data_Type = "Historical"
-    else:
-        raise ValueError("Unknown CMC data type")
+    #Chech Real_time Or historical
+
+    if not (d_type == "Historical" or d_type == "Real_time"):
+        raise ValueError("Restricted CMC Type ")
 
 
     with open(Path) as json_file:
@@ -32,7 +28,7 @@ def CMC_API_Transform(Path):
                 "circulating_supply" : data["circulating_supply"],
                 "max_supply" : data.get("max_supply"),
             }
-            if Raw_Data_Type == "Real-time":
+            if d_type == "Real_time":
                  dic["price" ]= data["quote"][0]["price"]
                  dic["market_cap" ]= data["quote"][0]["market_cap"]
                  dic["volume_24h" ]= data["quote"][0]["volume_24h"]
@@ -43,7 +39,7 @@ def CMC_API_Transform(Path):
                  dic["market_cap_dominance"] = data["quote"][0]["market_cap_dominance"]
                  dic["percent_change_90d"] = data["quote"][0]["percent_change_90d"]
 
-            elif Raw_Data_Type == "Historical":
+            elif d_type == "Historical":
                 dic["price"] = data["quote"]["USD"]["price"]
                 dic["market_cap"] = data["quote"]["USD"]["market_cap"]
                 dic["volume_24h"] = data["quote"]["USD"]["volume_24h"]
@@ -55,13 +51,15 @@ def CMC_API_Transform(Path):
             Filtered_Data.append(dic)
 
     df = pd.DataFrame(Filtered_Data)
-    print(df.info())
-    File_date= Path[-24:-5]
+
+    File_date= Path.split("/")[-1].replace(".json", "")
     BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-    Processed_DIR = os.path.join(BASE_DIR, "..", "..", "data", "processed","CMC",Raw_Data_Type)
-    df.to_csv(os.path.join(Processed_DIR,f"{File_date}.csv"), index=False)
+    Processed_DIR = os.path.join(BASE_DIR, "..", "..", "data", "processed","CMC",d_type)
+    os.makedirs(os.path.join(Processed_DIR), exist_ok=True)
+    FullPath = os.path.join(Processed_DIR, f"{File_date}.csv")
+    df.to_csv(f"{FullPath}", index=False )
 
 
-
+    return FullPath
 
 

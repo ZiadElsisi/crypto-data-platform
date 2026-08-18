@@ -103,7 +103,7 @@ For example:
 data.get("max_supply")
 
 ```
-```md
+
 # Storage Component
 
 ## Introduction
@@ -254,4 +254,4 @@ The final storage layer provides a single analytical database containing both Re
        └── CMC_Historical
 
 This structure provides a simple foundation for the next stage of the project: querying and analyzing the cryptocurrency data using SQL.
-```
+
