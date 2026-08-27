@@ -73,39 +73,37 @@ def Create_CMC_DuckDB ():
     return
 
 
-def Update_CMC_DuckDB (action="ignore"):
+def Update_CMC_DuckDB (path, d_type,action="ignore"):
 
-    if not os.path.exists(os.path.join(DB_Path)) :
-        raise FileNotFoundError(f"Database  does not exist")
+    if not os.path.isfile(path):
+        raise FileNotFoundError(f"Processed file does not exist: {path}")
+
+    if d_type not in Table_Schemes:
+        raise ValueError(f"Invalid data type: {d_type}")
+
+    if not os.path.exists(DB_Path) :
+        Create_CMC_DuckDB ()
+
 
 
     conn = duckdb.connect(DB_Path)
-    for DataCategory in ["Real_time","Historical"]:
-        Processed_DIR = os.path.join(BASE_DIR,"..","..","data","processed","CMC",DataCategory)
-        if not os.path.exists(Processed_DIR):
-            logging.warning(f"Processed Directory for {DataCategory} does not exist")
-            continue
 
+    file_name = os.path.basename(path).replace(".csv", "")
+    file_name_tstmp = datetime.datetime.strptime(file_name, "%Y-%m-%d_%H-%M-%S")
 
-        files = os.listdir(Processed_DIR)
-        for file in files:
-            if file.endswith(".csv"):
-                file_name=file.replace(".csv","")
-                file_name_tstmp = datetime.datetime.strptime(file_name, "%Y-%m-%d_%H-%M-%S")
-                if action == "ignore":
-                    conn.execute(f"""INSERT OR IGNORE INTO CMC_{DataCategory}  
-                                    Select *,'{file_name_tstmp}' from '{Processed_DIR}/{file}' """)
-                elif action == "update":
-                    conn.execute(f"""INSERT OR UPDATE INTO CMC_{DataCategory}  
-                                    Select *,'{file_name_tstmp}' from '{Processed_DIR}/{file}' """)
-                else :
-                    raise ValueError(f"Invalid action {action}")
-            else: continue
+    if action == "ignore":
+        conn.execute(f"""INSERT OR IGNORE INTO CMC_{d_type}  
+                         Select *,'{file_name_tstmp}' from '{path}' """)
+    elif action == "update":
+        conn.execute(f"""INSERT OR UPDATE INTO CMC_{d_type}  
+                                      Select *,'{file_name_tstmp}' from '{path}' """)
+    else:
+        raise ValueError(f"Invalid action {action}")
 
-        final =conn.execute(f"""select * from CMC_{DataCategory}""").df()
-        print(final)
-        print("Successfully updated")
-        print("-"*220)
+    final =conn.execute(f"""select * from CMC_{d_type}""").df()
+    print(final)
+    print("Successfully updated")
+    print("-"*220)
 
     conn.close()
 

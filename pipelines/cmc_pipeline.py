@@ -24,10 +24,10 @@ def run_pipeline(date_string=None):
         raw_file = api_ingest.cmc_api_ingest(date_string=date_string)
     except ValueError as e:
         logging.exception(f"invalid input {e}")
-        return
+        return False
     except Exception as e:
         logging.exception(f"error happened {e}")
-        return
+        return False
 
     logging.info(f"raw data ingested at {raw_file}")
 
@@ -35,55 +35,62 @@ def run_pipeline(date_string=None):
         processed_file = api_transform.cmc_api_transform(raw_file, d_type=d_type)
     except ValueError as e:
         logging.exception(f"invalid input {e}")
-        return
+        return False
     except FileNotFoundError as e:
         logging.exception(f"file {e} not found")
-        return
+        return False
     except Exception as e:
         logging.exception(f"error happened {e}")
-        return
+        return False
     logging.info(f"processed data transformed at {processed_file}")
 
     try:
         is_valid = Validation.validate_file(processed_file, d_type=d_type)
     except FileNotFoundError as e:
         logging.exception(f"file {e} not found")
-        return
+        return False
     except ValueError as e:
         logging.exception(f"invalid input {e}")
-        return
+        return False
     except Exception as e:
         logging.exception(f"error happened {e}")
-        return
+        return False
 
 
     if is_valid:
         logging.info("Data is valid")
         try:
-            DuckDB.Update_CMC_DuckDB()
+            DuckDB.Update_CMC_DuckDB(d_type=d_type,path=processed_file)
         except ValueError as e:
             logging.exception(f"invalid input {e}")
-            return
+            return False
         except Exception as e:
             logging.exception(f"error happened {e}")
-            return
+            return False
 
         try:
-            DuckDB.verify_load(path=processed_file, d_type=d_type)
+            verified =DuckDB.verify_load(path=processed_file, d_type=d_type)
         except ValueError as e:
             logging.exception(f"invalid input {e}")
-            return
+            return False
         except FileNotFoundError as e:
             logging.exception(f"file {e} not found")
-            return
+            return False
         except Exception as e:
             logging.exception(f"error happened {e}")
-            return
+            return False
+
+        if not verified :
+            logging.info("Data Verification failed ")
+            return False
 
         logging.info("Data is verified")
 
     else:
         logging.info("Data is invalid")
+        return False
+
     logging.info("Pipeline run finished")
+    return True
 if __name__ == "__main__":
         run_pipeline()
