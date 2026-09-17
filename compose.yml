@@ -1,0 +1,21 @@
+services: ## start with mentioning the services that you're going to use through this compose
+
+  airflow: ## airflow is one of services that we're going to use the name is optional
+
+    build:
+      context: . # the scope of  compose
+      dockerfile: airflow/Dockerfile
+    command: standalone
+    ports:
+      - "8080:8080"
+    env_file:
+      - .env
+    environment:
+      PYTHONPATH: /opt/airflow/project # let pyhon of the container knows what it will see
+
+    volumes: # it mounts your machine data to the container data files
+      - ./airflow/dags:/opt/airflow/dags
+      - ./airflow/logs:/opt/airflow/logs
+      - ./src:/opt/airflow/project/src
+      - ./data:/opt/airflow/project/data
+      - ./DuckDB:/opt/airflow/project/DuckDB

@@ -1,257 +1,166 @@
-Ingestion
+# Crypto Data Platform
 
-Responsibility:
-Acquire data from the coinmarketcap API and store the original data in the raw layer.
+A Python data pipeline that collects cryptocurrency market data from the CoinMarketCap API, validates and transforms it, then stores it in DuckDB. Apache Airflow orchestrates the real-time pipeline so each stage can be scheduled, monitored, retried, and debugged independently.
 
-Input:
-External data source [ coinmarketcap API ] and required request configuration.
+## Pipeline
 
-Output:
-Raw, unmodified data stored in data/raw/.
-
-Error handling:
-
-Failed or invalid requests should not be treated as successful ingestion.
-
-Configuration:
-
-Source credentials and request parameters should not be hard-coded.
-
-                 get_crypto_list()
-                       │
-             date_string provided?
-                 /            \
-               No              Yes
-               │                │
-        Current data       Historical data
-               │                │
-               └───────┬────────┘
-                       ↓
-                  API response
-                       ↓
-                  status check
-                    /     \
-                  error    success
-                            ↓
-                       JSON response
-                            ↓
-                        data/raw/
-
-
-# Data Transformation
-
-## Goal
-
-Transform the raw CoinMarketCap API JSON files into structured processed datasets that can be used by the next stages of the pipeline.
-
-## Technologies
-
-- **Python**
-- **Pandas** — create DataFrames and export processed data
-- **JSON** — read raw API responses
-- **OS** — file/path management
-- **CSV** — processed data output
-
-## What I Did
-
-### 1. Inspected the Raw Data
-
-Inspected the CoinMarketCap API responses and identified the fields needed for the processed dataset.
-
-Selected fields include:
-
-- `id`
-- `name`
-- `symbol`
-- `cmc_rank`
-- `last_updated`
-- `price`
-- `market_cap`
-- `market_cap_dominance`
-- `volume_24h`
-- `volume_change_24h`
-- `percent_change_1h`
-- `percent_change_24h`
-- `percent_change_7d`
-- `percent_change_90d`
-- `circulating_supply`
-- `max_supply`
-
-### 2. Defined the Processed Schema
-
-Defined the fields, data types, and purpose of the processed dataset before implementing the transformation.
-
-### 3. Built the Transformation Function
-
-Created a Python transformation function that:
-
-1. Checks whether the input file exists.
-2. Determines whether the data is **Real-time** or **Historical** from the file path.
-3. Reads the raw JSON.
-4. Extracts the required fields.
-5. Handles the differences between the Real-time and Historical API schemas.
-6. Creates a Pandas DataFrame.
-7. Saves the processed data as a CSV file.
-
-### 4. Handled Missing Values
-
-Handled fields that can be unavailable or `null`.
-
-For example:
-
-```python
-data.get("max_supply")
-
+```text
+CoinMarketCap API
+        |
+        v
+  Ingestion (raw JSON)
+        |
+        v
+Transformation (CSV)
+        |
+        v
+ Data-quality validation
+        |
+        v
+   DuckDB load
+        |
+        v
+ Load verification
 ```
 
-# Storage Component
+## Project structure
 
-## Introduction
+```text
+src/
+├── ingestion/api_ingest.py          # CoinMarketCap API request and raw JSON output
+├── transformation/api_transform.py  # JSON-to-CSV transformation
+├── DataQuality/Validation.py        # schema and value checks
+└── storage/DuckDB.py                # DuckDB table creation, loading, verification
 
-After the ingestion and transformation processes, the transformed cryptocurrency data needs to be stored in a way that makes it easy to query and analyze.
+pipelines/cmc_pipeline.py            # run the full pipeline with Python
+airflow/dags/crypto_data_pipeline.py # scheduled Airflow DAG
+data/raw/                             # generated raw API responses (ignored by Git)
+data/processed/                       # generated CSV files (ignored by Git)
+DuckDB/CMC.duckdb                     # generated analytical database (ignored by Git)
+```
 
-For this project, I chose **DuckDB** as the analytical database.
+## Components
 
-## Why DuckDB?
+### Ingestion
 
-DuckDB is suitable for this project because:
+`cmc_api_ingest()` fetches up to 1,000 currencies from CoinMarketCap.
 
-- It is lightweight and requires no separate database server.
-- It is designed for analytical workloads.
-- It works well with CSV and Parquet files.
-- It provides SQL querying capabilities.
-- It is simple to integrate with Python.
+- Without `date_string`, it requests real-time listings.
+- With `date_string` in `YYYY-MM-DD` format, it requests historical listings.
+- It saves unmodified API responses as timestamped JSON in `data/raw/CMC/<type>/`.
+- Invalid parameters, missing credentials, timeouts, and non-200 API responses raise errors.
 
-## Storage Structure
+### Transformation
 
-The processed data is separated into two categories:
+`cmc_api_transform()` reads raw JSON, extracts selected market fields, and writes timestamped CSV files to `data/processed/CMC/<type>/`.
 
-- **Real-time**
-- **Historical**
+### Data quality
 
-Instead of keeping every processed CSV as a separate database table, the files are loaded into one DuckDB database:
+`validate_file()` checks expected columns and data types, required values, unique coin IDs, and non-negative numeric values.
 
-    CMC.duckdb
-    │
-    ├── CMC_Real_time
-    │
-    └── CMC_Historical
+### Storage and verification
 
-Each table contains the records from all processed files belonging to its category.
+`Update_CMC_DuckDB()` loads a processed CSV into `DuckDB/CMC.duckdb`.
 
-## Real-time Table
+- Real-time data goes to `CMC_Real_time`.
+- Historical data goes to `CMC_Historical`.
+- `(id, Date_of_file)` is the primary key, making repeated loads safe.
+- `verify_load()` checks that loaded rows match the CSV row count.
 
-The `CMC_Real_time` table stores the real-time cryptocurrency data.
+## Local Python setup
 
-It contains fields such as:
+1. Create a `.env` file in the repository root:
 
-- `id`
-- `name`
-- `symbol`
-- `cmc_rank`
-- `last_updated`
-- `circulating_supply`
-- `max_supply`
-- `price`
-- `market_cap`
-- `volume_24h`
-- `volume_change_24h`
-- `percent_change_1h`
-- `percent_change_24h`
-- `percent_change_7d`
-- `market_cap_dominance`
-- `percent_change_90d`
-- `Date_of_file`
+   ```text
+   CRYPTO_API_KEY=your_coinmarketcap_api_key
+   ```
 
-The primary key is:
+2. Install dependencies:
 
-    (id, Date_of_file)
+   ```bash
+   pipenv install
+   ```
 
-This allows the same cryptocurrency to appear multiple times as long as each record belongs to a different file/timestamp.
+3. Run the pipeline directly:
 
-## Historical Table
+   ```bash
+   pipenv run python pipelines/cmc_pipeline.py
+   ```
 
-The `CMC_Historical` table stores historical cryptocurrency data.
+The `.env`, generated data, and DuckDB database are ignored by Git.
 
-Its schema is slightly different from the real-time table because the Historical API does not provide exactly the same fields.
+## Airflow orchestration
 
-It contains:
+The DAG ID is `crypto_data_pipeline`. It has one task for each component:
 
-- `id`
-- `name`
-- `symbol`
-- `cmc_rank`
-- `last_updated`
-- `circulating_supply`
-- `max_supply`
-- `price`
-- `market_cap`
-- `volume_24h`
-- `percent_change_1h`
-- `percent_change_24h`
-- `percent_change_7d`
-- `Date_of_file`
+```text
+ingest -> transform -> validate -> load -> verify
+```
 
-It also uses:
+The DAG at `airflow/dags/crypto_data_pipeline.py` imports your existing `src/` functions rather than duplicating pipeline logic. Its schedule uses a cron expression:
 
-    (id, Date_of_file)
+```python
+schedule="0 * * * *"  # start of every hour
+```
 
-as the primary key.
+Examples:
 
-## Loading Process
+```python
+schedule="*/30 * * * *"  # every 30 minutes
+schedule="0 9 * * *"     # daily at 09:00
+schedule=None             # manual runs only
+```
 
-The storage component reads the processed CSV files and inserts their records into the appropriate DuckDB table.
+Airflow schedules in UTC unless a timezone is configured.
 
-The process is:
+### Run Airflow locally
 
-    Processed CSV
-          ↓
-    Identify Data Category
-          ↓
-       Read File
-          ↓
-    Validate Structure
-          ↓
-    Add File Timestamp
-          ↓
-    Insert into DuckDB
+Ensure Docker is running and that `.env` contains `CRYPTO_API_KEY`, then run:
 
-The file timestamp is extracted from the filename and stored in `Date_of_file`.
+```bash
+docker compose up --build
+```
 
-This allows the database to preserve when each processed file was generated.
+Open [http://localhost:8080](http://localhost:8080), find `crypto_data_pipeline`, unpause it, and select **Trigger DAG**. Use Grid view to see task status; use a task's **Logs** to investigate failures.
 
-## Duplicate Handling
+To stop the environment:
 
-The storage process needs to be safe to run multiple times.
+```bash
+docker compose down
+```
 
-The primary key:
+## Retry behaviour
 
-    (id, Date_of_file)
+The ingestion task retries because external API calls can fail temporarily. To use exponential backoff, configure its task decorator like this:
 
-helps identify duplicate records.
+```python
+from datetime import datetime, timedelta
 
-The loader supports two actions:
+@task(
+    retries=3,
+    retry_delay=timedelta(minutes=2),
+    retry_exponential_backoff=True,
+    max_retry_delay=timedelta(minutes=15),
+)
+def ingest() -> str:
+    ...
+```
 
-- `ignore` — ignore records that already exist.
-- `update` — update an existing record when a conflict occurs.
+This waits progressively longer between failed attempts instead of retrying at a fixed interval.
 
-This makes the loading process **idempotent** and prevents accidentally creating duplicate records when the pipeline is executed again.
+## Useful Airflow commands
 
-## Result
+```bash
+# List DAGs known to Airflow.
+docker compose exec airflow airflow dags list
 
-The final storage layer provides a single analytical database containing both Real-time and Historical cryptocurrency data.
+# Trigger the crypto pipeline from the terminal.
+docker compose exec airflow airflow dags trigger crypto_data_pipeline
 
-    Raw JSON
-       ↓
-    Transformation
-       ↓
-    Processed CSV
-       ↓
-    Data Quality
-       ↓
-    CMC.duckdb
-       ├── CMC_Real_time
-       └── CMC_Historical
+# Follow Airflow container logs.
+docker compose logs -f airflow
+```
 
-This structure provides a simple foundation for the next stage of the project: querying and analyzing the cryptocurrency data using SQL.
+## Notes
 
+This Docker setup is for local development and learning. A production deployment needs a production-grade Airflow executor, external metadata storage, and a secrets-management solution rather than a local `.env` file.
