@@ -17,6 +17,7 @@ python-dotenv = "*"
 pandas-stubs = "~=3.0.5"
 duckdb = "*"
 adbc-driver-manager = "*"
+apache-airflow = "*"
 
 [dev-packages]
 

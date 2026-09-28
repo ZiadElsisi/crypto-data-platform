@@ -39,7 +39,7 @@ def cmc_api_ingest(limit=100 , date_string=None):
         Type = "Historical"
 
     # we added the token in the header as it's an http auth
-    headers = {"X-CMC_PRO_API_KEY": f"1{CRYPTO_API_KEY}"}
+    headers = {"X-CMC_PRO_API_KEY": f"{CRYPTO_API_KEY}"}
 
     r = requests.get(furl, headers=headers,timeout=10) # 10 sec allowed time for response
     if r.status_code != 200:
